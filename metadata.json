@@ -1,0 +1,6 @@
+{
+  "name": "Time Density: Big Bang",
+  "description": "Cyber-Zen arcade survival physics simulation with entropy engine, gesture mechanics, and Singularity gateway export transitions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

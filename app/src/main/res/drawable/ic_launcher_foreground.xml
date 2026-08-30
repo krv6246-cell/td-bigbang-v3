@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer Singularity Horizon Ring (Gold) -->
+    <path
+        android:strokeWidth="2.5"
+        android:strokeColor="#FFD700"
+        android:fillColor="#00000000"
+        android:pathData="M 54,54 m -24,0 a 24,24 0 1,0 48,0 a 24,24 0 1,0 -48,0" />
+
+    <!-- Lensing glow ring (Turquoise) -->
+    <path
+        android:strokeWidth="1.5"
+        android:strokeColor="#00E5FF"
+        android:fillColor="#00000000"
+        android:pathData="M 54,54 m -18,0 a 18,18 0 1,0 36,0 a 18,18 0 1,0 -36,0" />
+
+    <!-- Jade Quantum Core -->
+    <path
+        android:fillColor="#00E5A3"
+        android:pathData="M 54,54 m -10,0 a 10,10 0 1,0 20,0 a 10,10 0 1,0 -20,0" />
+
+    <!-- Pure Black Singularity Center Point -->
+    <path
+        android:fillColor="#05080A"
+        android:pathData="M 54,54 m -4.5,0 a 4.5,4.5 0 1,0 9,0 a 4.5,4.5 0 1,0 -9,0" />
+
+    <!-- Relativistic Quasar Beams / Quantum Rays -->
+    <path
+        android:strokeWidth="2"
+        android:strokeColor="#00E5FF"
+        android:pathData="M 54,24 L 54,34 M 54,74 L 54,84" />
+    <path
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFD700"
+        android:pathData="M 24,54 L 34,54 M 74,54 L 84,54" />
+
+    <!-- Accretion Sparks (4 diagonal nodes) -->
+    <path
+        android:fillColor="#00E5A3"
+        android:pathData="M 36,36 m -2,0 a 2,2 0 1,0 4,0 a 2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M 72,36 m -2,0 a 2,2 0 1,0 4,0 a 2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M 72,72 m -2,0 a 2,2 0 1,0 4,0 a 2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#00E5A3"
+        android:pathData="M 36,72 m -2,0 a 2,2 0 1,0 4,0 a 2,2 0 1,0 -4,0" />
+</vector>
+
