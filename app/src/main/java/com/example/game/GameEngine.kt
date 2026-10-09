@@ -24,7 +24,7 @@ data class GameState(
     val level: Int = 1, // 1 = Big Bang, 2 = Quasar, 3 = Point Zero
     val config: LevelConfig = Level1_Config,
     val universeCycle: Int = 1,
-    val phase: GamePhase = GamePhase.EXPANSION,
+    val phase: GamePhase = GamePhase.START_SCREEN,
     val density: Float = 100.0f, // 0..100%
     val dcoins: Int = 0,
     val currentCombo: Int = 0,
@@ -46,7 +46,12 @@ data class GameState(
     val playerFrequency: Float = 0.0f,
     val isResonating: Boolean = false,
     val resonancePrecision: Float = 0.0f,
-    val resonanceHoldDuration: Float = 0.0f
+    val resonanceHoldDuration: Float = 0.0f,
+    // Operator ability states (Burst / Freeze / Revive / Magnet / Shield)
+    val isTimeFrozen: Boolean = false,
+    val isShieldActive: Boolean = false,
+    val isMagnetActive: Boolean = false,
+    val operatorCooldowns: Map<String, Float> = emptyMap()
 )
 
 class GameEngine {
@@ -70,6 +75,19 @@ class GameEngine {
     private var screenWidth = 1080f
     private var screenHeight = 1920f
     private var targetOscillatorPhase = 0f
+
+    // Operator ability timers
+    private val operatorCooldownsInternal = mutableMapOf<String, Float>()
+    private var freezeTimer = 0f
+    private var shieldTimer = 0f
+    private var magnetTimer = 0f
+
+    companion object {
+        const val OPERATOR_COOLDOWN = 12f
+        const val FREEZE_DURATION = 5f
+        const val SHIELD_DURATION = 8f
+        const val MAGNET_DURATION = 2.5f
+    }
 
     // Base entropy rates for Level 1
     private val baseEntropyL1 = floatArrayOf(0.005f, 0.015f, 0.03f)
@@ -105,12 +123,28 @@ class GameEngine {
         return rate
     }
 
+    fun resetToStartScreen() {
+        bubbles.clear()
+        particles.clear()
+        shockwaves.clear()
+        floatingTexts.clear()
+        gestureTrails.clear()
+        _state.value = GameState(
+            phase = GamePhase.START_SCREEN,
+            density = 100.0f
+        )
+    }
+
     fun startNewGame(cycle: Int = 1, level: Int = 1, carryDcoins: Int = 0) {
         bubbles.clear()
         particles.clear()
         shockwaves.clear()
         floatingTexts.clear()
         gestureTrails.clear()
+        operatorCooldownsInternal.clear()
+        freezeTimer = 0f
+        shieldTimer = 0f
+        magnetTimer = 0f
 
         val config = when (level) {
             2 -> Level2_Config
@@ -149,6 +183,7 @@ class GameEngine {
     fun transitionToLevel2() {
         val current = _state.value
         bubbles.clear()
+        gestureTrails.clear()
 
         _state.value = current.copy(
             level = 2,
@@ -173,6 +208,7 @@ class GameEngine {
         val current = _state.value
         bubbles.clear()
         particles.clear()
+        gestureTrails.clear()
 
         _state.value = current.copy(
             level = 3,
@@ -193,6 +229,10 @@ class GameEngine {
 
         initZeroPointVisuals()
         hapticListener?.invoke(HapticFeedbackEvent.LevelTransition(3))
+    }
+
+    fun setPaused(paused: Boolean) {
+        _state.value = _state.value.copy(isPaused = paused)
     }
 
     private fun initQuasarVisuals() {
@@ -238,6 +278,10 @@ class GameEngine {
     }
 
     fun update(deltaSeconds: Float) {
+        val snapshot = _state.value
+        if (!snapshot.isPaused) {
+            updateOperatorTimers(deltaSeconds)
+        }
         val current = _state.value
         if (current.isPaused) return
 
@@ -245,6 +289,12 @@ class GameEngine {
             val newProgress = (current.transitionProgress + deltaSeconds * 0.45f).coerceAtMost(1f)
             _state.value = current.copy(transitionProgress = newProgress)
             updateTransitionPhysics(deltaSeconds)
+            return
+        }
+
+        if (current.phase == GamePhase.START_SCREEN) {
+            updateSpawning(deltaSeconds, current.phase, current.config)
+            updateParticles(deltaSeconds, current)
             return
         }
 
@@ -293,7 +343,9 @@ class GameEngine {
 
         val rawEntropyRate = updateEntropy(current.density, newPhase.id, current.config)
         val dilationFactor = if (current.isDilationAnchorActive) 0.35f else 1.0f
-        val entropyDrain = (rawEntropyRate * 100f * dilationFactor) * deltaSeconds
+        val freezeFactor = if (current.isTimeFrozen) 0f else 1f
+        val shieldFactor = if (current.isShieldActive) 0.5f else 1f
+        val entropyDrain = (rawEntropyRate * 100f * dilationFactor * freezeFactor * shieldFactor) * deltaSeconds
 
         val newDensity = (current.density - entropyDrain).coerceIn(0f, 100f)
         val totalEntropyResisted = current.entropyResistedTotal + entropyDrain
@@ -339,19 +391,20 @@ class GameEngine {
             holdDuration += deltaSeconds
             val coinRate = (60 * precision * current.config.currencyMultiplier * deltaSeconds).toInt()
             newDcoins += coinRate
-            newDensity = (newDensity + (18f * precision * deltaSeconds)).coerceAtMost(100f)
+            newDensity = (newDensity + (22f * precision * deltaSeconds)).coerceAtMost(100f)
 
             // Tactile feedback for frequency resonance matching
             hapticListener?.invoke(HapticFeedbackEvent.FrequencyResonanceMatch(precision))
 
-            if (holdDuration >= 5.0f && newDensity >= 95f) {
-                // Point Zero transcendence reached
+            if (holdDuration >= 5.0f) {
+                // Point Zero transcendence reached after holding 5 seconds
                 initiateBlackHoleTransition("PointZeroEvolution")
                 return
             }
         } else {
-            holdDuration = (holdDuration - deltaSeconds * 1.5f).coerceAtLeast(0f)
-            newDensity = (newDensity - (10f * deltaSeconds)).coerceAtLeast(0f)
+            holdDuration = (holdDuration - deltaSeconds * 2.5f).coerceAtLeast(0f)
+            val decayRate = if (current.isTimeFrozen) 0f else if (current.isShieldActive) 1.75f else 3.5f
+            newDensity = (newDensity - (decayRate * deltaSeconds)).coerceAtLeast(0f)
         }
 
         if (newDensity <= 5f) {
@@ -371,6 +424,9 @@ class GameEngine {
             resonanceHoldDuration = holdDuration
         )
 
+        // Allow ambient quanta and standing wave nodes in Level 3
+        updateSpawning(deltaSeconds, phase, current.config)
+        updateEntities(deltaSeconds, current)
         updateParticles(deltaSeconds, current)
         updateShockwaves(deltaSeconds)
         updateFloatingTexts(deltaSeconds)
@@ -397,6 +453,30 @@ class GameEngine {
     }
 
     private fun updateSpawning(delta: Float, phase: GamePhase, config: LevelConfig) {
+        if (phase == GamePhase.START_SCREEN) {
+            spawnTimer += delta
+            if (spawnTimer >= 0.15f) {
+                spawnTimer = 0f
+                val centerX = screenWidth / 2f
+                val centerY = screenHeight / 2f
+                val angle = Random.nextFloat() * 2f * PI.toFloat()
+                val speed = Random.nextFloat() * 40f + 20f
+                val life = Random.nextFloat() * 2f + 1f
+                particles.add(
+                    Particle(
+                        position = Offset(centerX, centerY),
+                        velocity = Offset(cos(angle) * speed, sin(angle) * speed),
+                        alpha = 1.0f,
+                        size = Random.nextFloat() * 3f + 1f,
+                        color = RadiantTurquoise.copy(alpha = 0.4f),
+                        life = life,
+                        maxLife = life
+                    )
+                )
+            }
+            return
+        }
+
         if (config.spawnRate <= 0f) return
         spawnTimer += delta
         val baseInterval = when (phase) {
@@ -426,7 +506,14 @@ class GameEngine {
 
     private fun spawnQuantumBubble(phase: GamePhase, config: LevelConfig) {
         val roll = Random.nextFloat()
-        val type = if (config.level == 2) {
+        val type = if (config.level == 3) {
+            when {
+                roll < 0.25f -> QuantumType.PHANTOM_SINGULARITY
+                roll < 0.50f -> QuantumType.GOLDEN_DCOIN
+                roll < 0.80f -> QuantumType.JADE_NODE
+                else -> QuantumType.TURQUOISE_BUBBLE
+            }
+        } else if (config.level == 2) {
             when {
                 roll < 0.25f -> QuantumType.PHANTOM_SINGULARITY
                 roll < 0.55f -> QuantumType.TURQUOISE_BUBBLE
@@ -499,7 +586,7 @@ class GameEngine {
             QuantumType.TURQUOISE_BUBBLE -> 9f
             QuantumType.JADE_NODE -> 16f
             QuantumType.GOLDEN_DCOIN -> 4f
-            QuantumType.ANTIMATTER_ANOMALY -> -12f
+            QuantumType.ANTIMATTER_ANOMALY -> 12f
             QuantumType.PHANTOM_SINGULARITY -> -config.phantomPenalty
         }
 
@@ -602,6 +689,14 @@ class GameEngine {
                         bubble.velocity.y + (ay / aDist) * pull
                     )
                 }
+            }
+
+            if (state.isMagnetActive) {
+                val magnetPull = 700f * delta
+                bubble.velocity = Offset(
+                    bubble.velocity.x - (dx / dist) * magnetPull,
+                    bubble.velocity.y - (dy / dist) * magnetPull
+                )
             }
 
             val newPos = Offset(
@@ -735,11 +830,123 @@ class GameEngine {
         }
     }
 
+    // --- OPERATOR ABILITIES (Burst / Freeze / Revive / Magnet / Shield) ---
+
+    fun isOperatorReady(id: String): Boolean = (operatorCooldownsInternal[id] ?: 0f) <= 0f
+
+    fun activateOperator(id: String): Boolean {
+        val current = _state.value
+        if (current.isPaused || current.isTransitioning) return false
+        if (!isOperatorReady(id)) return false
+
+        operatorCooldownsInternal[id] = OPERATOR_COOLDOWN
+        val center = Offset(screenWidth / 2f, screenHeight / 2f)
+
+        when (id) {
+            "BURST" -> {
+                val phantoms = bubbles.filter { it.type == QuantumType.PHANTOM_SINGULARITY }
+                bubbles.removeAll(phantoms)
+                phantoms.forEach { spawnBurst(it.position, it.type, 10) }
+                shockwaves.add(
+                    Shockwave(center = center, radius = 10f, maxRadius = screenWidth * 0.9f, alpha = 0.9f, color = RadiantTurquoise)
+                )
+                floatingTexts.add(
+                    FloatingText(id = nextEntityId++, text = "BURST: PHANTOMS PURGED", position = Offset(center.x, center.y - 160f), color = RadiantTurquoise)
+                )
+                _state.value = _state.value.copy(density = (_state.value.density + 12f).coerceAtMost(100f))
+            }
+            "FREEZE" -> {
+                freezeTimer = FREEZE_DURATION
+                shockwaves.add(
+                    Shockwave(center = center, radius = 10f, maxRadius = screenWidth * 0.8f, alpha = 0.8f, color = QuasarBlueShift)
+                )
+                floatingTexts.add(
+                    FloatingText(id = nextEntityId++, text = "TIME FREEZE ACTIVE", position = Offset(center.x, center.y - 160f), color = QuasarBlueShift)
+                )
+            }
+            "REVIVE" -> {
+                _state.value = _state.value.copy(density = maxOf(_state.value.density, 45f))
+                shockwaves.add(
+                    Shockwave(center = center, radius = 10f, maxRadius = screenWidth * 0.7f, alpha = 0.85f, color = QuantumJade)
+                )
+                floatingTexts.add(
+                    FloatingText(id = nextEntityId++, text = "REVIVE: DENSITY RESTORED", position = Offset(center.x, center.y - 160f), color = QuantumJade)
+                )
+            }
+            "MAGNET" -> {
+                magnetTimer = MAGNET_DURATION
+                shockwaves.add(
+                    Shockwave(center = center, radius = 10f, maxRadius = screenWidth * 0.6f, alpha = 0.8f, color = SingularityGold)
+                )
+                floatingTexts.add(
+                    FloatingText(id = nextEntityId++, text = "MAGNET: QUANTA ATTRACTED", position = Offset(center.x, center.y - 160f), color = SingularityGold)
+                )
+            }
+            "SHIELD" -> {
+                shieldTimer = SHIELD_DURATION
+                shockwaves.add(
+                    Shockwave(center = center, radius = 10f, maxRadius = screenWidth * 0.7f, alpha = 0.8f, color = CoronaAmber)
+                )
+                floatingTexts.add(
+                    FloatingText(id = nextEntityId++, text = "SHIELD: ENTROPY DAMPED", position = Offset(center.x, center.y - 160f), color = CoronaAmber)
+                )
+            }
+        }
+
+        syncOperatorFlags()
+        return true
+    }
+
+    private fun syncOperatorFlags() {
+        _state.value = _state.value.copy(
+            isTimeFrozen = freezeTimer > 0f,
+            isShieldActive = shieldTimer > 0f,
+            isMagnetActive = magnetTimer > 0f,
+            operatorCooldowns = operatorCooldownsInternal.toMap()
+        )
+    }
+
+    private fun updateOperatorTimers(delta: Float) {
+        if (operatorCooldownsInternal.isNotEmpty()) {
+            operatorCooldownsInternal.keys.forEach { k ->
+                operatorCooldownsInternal[k] = ((operatorCooldownsInternal[k] ?: 0f) - delta).coerceAtLeast(0f)
+            }
+        }
+        if (freezeTimer > 0f) freezeTimer = (freezeTimer - delta).coerceAtLeast(0f)
+        if (shieldTimer > 0f) shieldTimer = (shieldTimer - delta).coerceAtLeast(0f)
+        if (magnetTimer > 0f) magnetTimer = (magnetTimer - delta).coerceAtLeast(0f)
+        syncOperatorFlags()
+    }
+
     // --- GESTURE INTERACTIONS ---
 
     fun handleTap(tapPos: Offset): Boolean {
         val current = _state.value
         if (current.isPaused || current.isTransitioning) return false
+
+        if (current.level == 3) {
+            // Level 3 requirement: Any tap gives visual ripples without affecting gameplay
+            shockwaves.add(
+                Shockwave(
+                    center = tapPos,
+                    radius = 8f,
+                    maxRadius = 200f,
+                    alpha = 0.85f,
+                    color = SingularityGold
+                )
+            )
+            shockwaves.add(
+                Shockwave(
+                    center = tapPos,
+                    radius = 20f,
+                    maxRadius = 140f,
+                    alpha = 0.5f,
+                    color = RadiantTurquoise
+                )
+            )
+            hapticListener?.invoke(HapticFeedbackEvent.EmptyTap)
+            return false
+        }
 
         var hit = false
         val iterator = bubbles.iterator()
@@ -763,7 +970,7 @@ class GameEngine {
             if (dist <= bubble.radius + 32f) {
                 hit = true
                 iterator.remove()
-                processBubbleHarvest(bubble, tapPos, current)
+                processBubbleHarvest(bubble, tapPos)
                 break
             }
         }
@@ -774,6 +981,7 @@ class GameEngine {
             if (current.level == 2) {
                 hapticListener?.invoke(HapticFeedbackEvent.ParticleRepel)
             }
+            hapticListener?.invoke(HapticFeedbackEvent.EmptyTap)
         }
 
         return hit
@@ -816,6 +1024,7 @@ class GameEngine {
         if (swipeLen < 40f) return
 
         var harvested = 0
+        var dissolvedPhantoms = 0
         val iterator = bubbles.iterator()
 
         while (iterator.hasNext()) {
@@ -824,23 +1033,40 @@ class GameEngine {
 
             if (distToSegment <= bubble.radius + 38f) {
                 iterator.remove()
-                processBubbleHarvest(bubble, bubble.position, current)
-                harvested++
+                if (bubble.type == QuantumType.PHANTOM_SINGULARITY) {
+                    // Штраф только за фантомы (X)!
+                    dissolvedPhantoms++
+                    processBubbleHarvest(bubble, bubble.position)
+                } else {
+                    // Все обычные квантовые частицы (включая Dcoins, Jade, Turquoise, Antimatter) добавляют очки и плотность
+                    processBubbleHarvest(bubble, bubble.position)
+                    harvested++
+                }
             }
         }
 
         val mid = Offset((start.x + end.x) / 2f, (start.y + end.y) / 2f)
+        val shockwaveColor = when (current.level) {
+            3 -> SingularityGold
+            2 -> QuasarBlueShift
+            else -> RadiantTurquoise
+        }
+
         shockwaves.add(
             Shockwave(
                 center = mid,
                 radius = 12f,
                 maxRadius = swipeLen * 0.7f,
                 alpha = 0.75f,
-                color = if (current.level == 2) QuasarBlueShift else QuantumJade
+                color = shockwaveColor
             )
         )
 
-        hapticListener?.invoke(HapticFeedbackEvent.SwipeSweep(harvested.coerceAtLeast(1)))
+        if (dissolvedPhantoms > 0) {
+            hapticListener?.invoke(HapticFeedbackEvent.PhantomDissolve)
+        } else if (harvested > 0) {
+            hapticListener?.invoke(HapticFeedbackEvent.SwipeSweep(harvested))
+        }
 
         if (harvested > 1) {
             floatingTexts.add(
@@ -864,21 +1090,25 @@ class GameEngine {
         )
     }
 
-    private fun processBubbleHarvest(bubble: QuantumBubble, interactionPos: Offset, current: GameState) {
-        val combo = current.currentCombo + 1
+    private fun processBubbleHarvest(bubble: QuantumBubble, interactionPos: Offset) {
+        val current = _state.value
+        val isPhantom = bubble.type == QuantumType.PHANTOM_SINGULARITY
+
+        val combo = if (isPhantom) 0 else current.currentCombo + 1
         val maxC = maxOf(current.maxCombo, combo)
         val comboMultiplier = (1 + (combo / 4)).coerceAtMost(5)
 
-        val baseGained = (bubble.value * comboMultiplier * current.config.currencyMultiplier).toInt()
-        val gainedCoins = if (bubble.type == QuantumType.PHANTOM_SINGULARITY) 0 else baseGained
+        val baseGained = if (isPhantom) 0 else (bubble.value * comboMultiplier * current.config.currencyMultiplier).toInt().coerceAtLeast(1)
+        val gainedCoins = baseGained
 
         val newDcoins = current.dcoins + gainedCoins
-        val newDensity = (current.density + bubble.densityBoost).coerceIn(0f, 100f)
+        val densityDelta = if (isPhantom && current.isShieldActive) 0f else bubble.densityBoost
+        val newDensity = (current.density + densityDelta).coerceIn(0f, 100f)
 
         _state.value = current.copy(
             dcoins = newDcoins,
             density = newDensity,
-            currentCombo = if (bubble.type == QuantumType.PHANTOM_SINGULARITY) 0 else combo,
+            currentCombo = combo,
             maxCombo = maxC
         )
 
@@ -954,5 +1184,14 @@ class GameEngine {
         val dx = p.x - projX
         val dy = p.y - projY
         return sqrt(dx * dx + dy * dy)
+    }
+
+    fun stopEngine() {
+        hapticListener = null
+        bubbles.clear()
+        particles.clear()
+        shockwaves.clear()
+        floatingTexts.clear()
+        gestureTrails.clear()
     }
 }

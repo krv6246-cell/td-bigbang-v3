@@ -12,6 +12,7 @@ import com.example.ui.theme.RadiantTurquoise
 import com.example.ui.theme.SingularityGold
 
 enum class GamePhase(val id: Int, val title: String, val subtitle: String, val color: Color) {
+    START_SCREEN(0, "Start", "Initialization", RadiantTurquoise),
     EXPANSION(1, "Phase I: Expansion", "Cosmic Inflation • Turquoise Quanta", RadiantTurquoise),
     EQUILIBRIUM(2, "Phase II: Equilibrium", "Harmonic Balance • Jade & Gold Resonance", QuantumJade),
     COMPRESSION(3, "Phase III: Compression", "Gravitational Pull • Critical Horizon", SingularityGold),
@@ -60,9 +61,9 @@ val Level2_Config = LevelConfig(
 val Level3_Config = LevelConfig(
     level = 3,
     baseEntropy = 0.0f,
-    spawnRate = 0.0f,
+    spawnRate = 0.8f,
     particleBehavior = "resonance",
-    phantomPenalty = 0f,
+    phantomPenalty = 10f,
     currencyMultiplier = 2.0f
 )
 
@@ -73,6 +74,9 @@ sealed interface HapticFeedbackEvent {
     data class SwipeSweep(val count: Int) : HapticFeedbackEvent
     data class FrequencyResonanceMatch(val precision: Float) : HapticFeedbackEvent
     data class LevelTransition(val level: Int) : HapticFeedbackEvent
+    data object EmptyTap : HapticFeedbackEvent
+    data object PhantomTap : HapticFeedbackEvent
+    data object PhantomDissolve : HapticFeedbackEvent
 }
 
 data class QuantumBubble(
@@ -107,10 +111,11 @@ data class Shockwave(
 )
 
 data class GestureTrail(
-    val id: Long,
+    val id: Long = 0L,
     val points: List<Offset>,
-    val alpha: Float,
-    val color: Color
+    var alpha: Float = 1.0f,
+    val color: Color = RadiantTurquoise,
+    val level: Int = 1
 )
 
 data class FloatingText(

@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +40,7 @@ import com.example.ui.theme.RadiantTurquoise
 import com.example.ui.theme.SingularityGold
 import com.example.ui.theme.SpaceVoid
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -46,7 +48,6 @@ import kotlin.math.sin
 fun GameCanvas(
     engine: GameEngine,
     state: GameState,
-    touchTrails: List<List<Offset>>,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "singularity_pulse")
@@ -154,22 +155,6 @@ fun GameCanvas(
         // 6. Draw Quantum Bubbles
         for (bubble in engine.bubbles) {
             drawQuantumBubble(bubble, pulseAnim)
-        }
-
-        // 7. Draw Touch Gestures Trails
-        for (trail in touchTrails) {
-            if (trail.size > 1) {
-                val path = Path()
-                path.moveTo(trail.first().x, trail.first().y)
-                for (i in 1 until trail.size) {
-                    path.lineTo(trail[i].x, trail[i].y)
-                }
-                drawPath(
-                    path = path,
-                    color = if (state.level == 2) QuasarBlueShift.copy(alpha = 0.75f) else RadiantTurquoise.copy(alpha = 0.65f),
-                    style = Stroke(width = 6f, cap = StrokeCap.Round)
-                )
-            }
         }
 
         // 8. Draw Shockwaves
@@ -359,61 +344,71 @@ private fun DrawScope.drawPointZeroResonanceField(
     state: GameState,
     pulse: Float
 ) {
-    val targetY = height * (1.0f - state.targetFrequency)
-    val playerY = height * (1.0f - state.playerFrequency)
     val precision = state.resonancePrecision
+    val freqDiff = abs(state.playerFrequency - state.targetFrequency)
+    val matchRatio = (1.0f - (freqDiff / 0.38f)).coerceIn(0f, 1f)
 
-    // 1. Target Carrier Wave Nodal Band
-    val bandColor = if (precision > 0.7f) SingularityGold else RadiantTurquoise
+    val centerY = center.y
+    val glowAlpha = (0.25f + matchRatio * 0.55f).coerceIn(0.25f, 0.85f)
+
+    // 1. Target Resonance Harmonic Node Field (Golden Halo)
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(bandColor.copy(alpha = 0.45f), Color.Transparent),
-            center = Offset(center.x, targetY),
-            radius = width * 0.7f
+            colors = listOf(
+                SingularityGold.copy(alpha = glowAlpha * 0.5f),
+                RadiantTurquoise.copy(alpha = 0.12f),
+                Color.Transparent
+            ),
+            center = center,
+            radius = width * (0.45f + precision * 0.25f)
         ),
-        radius = width * 0.7f,
-        center = Offset(center.x, targetY)
+        radius = width * (0.45f + precision * 0.25f),
+        center = center
     )
 
-    drawLine(
-        color = bandColor.copy(alpha = 0.7f),
-        start = Offset(40f, targetY),
-        end = Offset(width - 40f, targetY),
-        strokeWidth = 2.5f,
-        cap = StrokeCap.Round
-    )
+    // 2. Standing Golden Target Wave (Золотая опорная волна)
+    val targetWavePath = Path()
+    val steps = 90
+    val targetCycles = 2.0f + state.targetFrequency * 4.0f
+    val waveAmp = 40f + precision * 20f
 
-    // 2. Harmonic Lissajous / Chladni Wave Interference
-    val wavePath = Path()
-    val steps = 80
     for (i in 0..steps) {
         val x = (i.toFloat() / steps) * width
-        val wave1 = sin((x / width) * 4 * PI.toFloat() + pulse * 2 * PI.toFloat()) * (40f * (1f - precision * 0.7f))
-        val wave2 = cos((x / width) * 6 * PI.toFloat() - pulse * 2 * PI.toFloat()) * (25f * (1f - precision * 0.7f))
-        val y = targetY + wave1 + wave2
-        if (i == 0) wavePath.moveTo(x, y) else wavePath.lineTo(x, y)
+        val angle = 2f * PI.toFloat() * targetCycles * (i.toFloat() / steps) + pulse * 2f * PI.toFloat()
+        val y = centerY + sin(angle) * waveAmp
+        if (i == 0) targetWavePath.moveTo(x, y) else targetWavePath.lineTo(x, y)
     }
 
     drawPath(
-        path = wavePath,
-        color = if (precision > 0.8f) SingularityGold else RadiantTurquoise.copy(alpha = 0.6f),
-        style = Stroke(width = if (precision > 0.8f) 3.5f else 1.8f)
+        path = targetWavePath,
+        color = SingularityGold.copy(alpha = glowAlpha),
+        style = Stroke(width = 4f + matchRatio * 3f, cap = StrokeCap.Round)
     )
 
-    // 3. Player Frequency Indicator Cursor
-    if (state.isResonating) {
-        drawLine(
-            color = if (precision > 0.8f) SingularityGold else Color.White.copy(alpha = 0.8f),
-            start = Offset(60f, playerY),
-            end = Offset(width - 60f, playerY),
-            strokeWidth = 3f,
-            cap = StrokeCap.Round
-        )
+    // 3. Player Tuned Carrier Wave (Циановая волна игрока)
+    val playerWavePath = Path()
+    val playerCycles = 2.0f + state.playerFrequency * 4.0f
 
+    for (i in 0..steps) {
+        val x = (i.toFloat() / steps) * width
+        val angle = 2f * PI.toFloat() * playerCycles * (i.toFloat() / steps) + pulse * 2f * PI.toFloat()
+        val y = centerY + sin(angle) * waveAmp
+        if (i == 0) playerWavePath.moveTo(x, y) else playerWavePath.lineTo(x, y)
+    }
+
+    drawPath(
+        path = playerWavePath,
+        color = RadiantTurquoise.copy(alpha = glowAlpha),
+        style = Stroke(width = 4f + matchRatio * 3f, cap = StrokeCap.Round)
+    )
+
+    // 4. Interference Node Ring when in resonance
+    if (precision > 0.65f) {
         drawCircle(
-            color = if (precision > 0.8f) SingularityGold else Color.White,
-            radius = 12f + pulse * 6f,
-            center = Offset(center.x, playerY)
+            color = SingularityGold.copy(alpha = (precision - 0.65f) * 2.5f),
+            radius = 36f + pulse * 18f,
+            center = center,
+            style = Stroke(width = 3f)
         )
     }
 }
@@ -624,31 +619,89 @@ private fun DrawScope.drawSingularityTransitionDistortion(
     progress: Float,
     reason: String
 ) {
-    val warpRadius = (width * 1.2f) * (1f - progress)
     val haloColor = if (reason.contains("Evolution")) SingularityGold else CriticalHorizon
+    val secondaryColor = if (reason.contains("Evolution")) QuantumJade else AntimatterViolet
+    val maxRadius = width.coerceAtLeast(height) * 1.3f
 
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(
-                haloColor.copy(alpha = 0.95f),
-                Color.Black.copy(alpha = (progress * 0.95f).coerceIn(0f, 1f)),
-                Color.Black
+    // 1. Коллапсирующий вихрь искривления пространства-времени (Vortex Accretion Disk)
+    val vortexRotation = progress * 540f
+    rotate(vortexRotation, pivot = center) {
+        // Радиальный градиент горизонта событий
+        val horizonRadius = (maxRadius * (1f - progress * 0.75f)).coerceAtLeast(20f)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    haloColor.copy(alpha = (0.95f * (1f - progress * 0.3f)).coerceIn(0f, 1f)),
+                    secondaryColor.copy(alpha = (0.75f * (1f - progress * 0.5f)).coerceIn(0f, 1f)),
+                    Color.Black.copy(alpha = (progress * 0.98f).coerceIn(0f, 1f)),
+                    Color.Black
+                ),
+                center = center,
+                radius = horizonRadius
             ),
+            radius = maxRadius,
+            center = center
+        )
+
+        // 2. Спиральные лучи падения материи в сингулярность (Relativistic Infall Spirals)
+        val spiralArms = 8
+        for (arm in 0 until spiralArms) {
+            val baseAngle = (arm * (2 * PI / spiralArms)).toFloat()
+            val path = Path()
+            var first = true
+            val steps = 15
+            for (step in 0..steps) {
+                val stepFraction = step.toFloat() / steps
+                val currentDist = (maxRadius * (1f - progress * 0.6f)) * (1f - stepFraction * 0.85f)
+                val currentAngle = baseAngle + (stepFraction * 3.5f) + (progress * 2f)
+                val x = center.x + cos(currentAngle) * currentDist
+                val y = center.y + sin(currentAngle) * currentDist
+                if (first) {
+                    path.moveTo(x, y)
+                    first = false
+                } else {
+                    path.lineTo(x, y)
+                }
+            }
+            drawPath(
+                path = path,
+                color = haloColor.copy(alpha = ((1f - progress * 0.7f) * 0.65f)),
+                style = Stroke(width = (4.5f * (1f - progress * 0.4f)).coerceAtLeast(1.5f), cap = StrokeCap.Round)
+            )
+        }
+    }
+
+    // 3. Концентрические сжимающиеся кольца горизонта событий (Event Horizon Collapse Rings)
+    val numRings = 6
+    for (i in 1..numRings) {
+        val baseR = (maxRadius * (i.toFloat() / numRings)) * (1f - progress * 0.82f)
+        drawCircle(
+            color = haloColor.copy(alpha = ((1f - progress * 0.8f) * 0.85f).coerceIn(0f, 1f)),
+            radius = baseR.coerceAtLeast(3f),
             center = center,
-            radius = (width * 0.8f * (1f + progress)).coerceAtLeast(10f)
-        ),
-        radius = width * 1.5f,
+            style = Stroke(width = (3.5f * (1f - progress * 0.3f)).coerceAtLeast(1f))
+        )
+    }
+
+    // 4. Центральная чёрная дыра сингулярности, поглощающая всё игровое поле
+    val singularityCoreRadius = (width * 0.28f * (1f - progress * 0.5f) + 15f).coerceAtLeast(6f)
+    drawCircle(
+        color = Color.Black,
+        radius = singularityCoreRadius,
         center = center
     )
+    drawCircle(
+        color = haloColor,
+        radius = singularityCoreRadius,
+        center = center,
+        style = Stroke(width = (3f * (1f - progress * 0.3f)).coerceAtLeast(1.5f))
+    )
 
-    val numRings = 5
-    for (i in 1..numRings) {
-        val r = (warpRadius * (i.toFloat() / numRings)) * (1f - progress * 0.5f)
-        drawCircle(
-            color = haloColor.copy(alpha = (1f - progress) * 0.8f),
-            radius = r.coerceAtLeast(2f),
-            center = center,
-            style = Stroke(width = 3.5f)
+    // 5. Вспышка квантовой сингулярности на финальной фазе схлопывания (progress > 0.85)
+    if (progress > 0.85f) {
+        val flashT = (progress - 0.85f) / 0.15f
+        drawRect(
+            color = haloColor.copy(alpha = flashT * 0.75f)
         )
     }
 }
