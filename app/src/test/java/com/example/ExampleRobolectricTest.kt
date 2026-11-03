@@ -154,6 +154,7 @@ class ExampleRobolectricTest {
         assertEquals(toggled, audioEngine.isMuted())
 
         // Test sounds trigger safely without exceptions
+        audioEngine.playCosmicIgnition()
         audioEngine.playDcoinHarvest(combo = 5)
         audioEngine.playEmptyTapOrPhantom(isPhantom = false)
         audioEngine.playEmptyTapOrPhantom(isPhantom = true)
@@ -241,7 +242,7 @@ class ExampleRobolectricTest {
         engine.startNewGame(level = 1, carryDcoins = 10)
         val initialCoins = engine.state.value.dcoins
 
-        // Manually place two regular bubbles along swipe line (200, 300) -> (400, 300)
+        // Place two bubbles close enough to harvest with separate taps.
         engine.bubbles.clear()
         engine.bubbles.add(
             com.example.game.QuantumBubble(
@@ -271,7 +272,7 @@ class ExampleRobolectricTest {
         engine.handleTap(androidx.compose.ui.geometry.Offset(350f, 300f))
 
         // Both bubbles should be harvested, dcoins should INCREASE (never decrease)
-        assertTrue("Dcoins must increase after swiping bubbles", engine.state.value.dcoins > initialCoins)
+        assertTrue("Dcoins must increase after tapping bubbles", engine.state.value.dcoins > initialCoins)
         assertTrue("Density must not decrease from harvesting regular bubbles", engine.state.value.density >= densityBefore)
         assertEquals("Combo should increment for each harvested bubble", 2, engine.state.value.currentCombo)
 

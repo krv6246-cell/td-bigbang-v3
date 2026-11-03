@@ -410,6 +410,8 @@ class BigBangAudioEngine(context: Context) {
                 continue
             }
 
+            val stepSamples = ambientStepSamples()
+
             // Перенос ожидающих звуковых событий
             while (!pendingSounds.isEmpty()) {
                 pendingSounds.poll()?.let { activeSounds.add(it) }
@@ -443,7 +445,7 @@ class BigBangAudioEngine(context: Context) {
                 }
 
                 // 3. Procedural soundtrack with a different tempo for each universe.
-                val musicSample = generateAmbientMusicSample(ambientStepSamples())
+                val musicSample = generateAmbientMusicSample(stepSamples)
 
                 val finalMix = fxSample + alarmSample + (musicSample * 0.28)
                 val softClipped = finalMix.coerceIn(-0.95, 0.95)
