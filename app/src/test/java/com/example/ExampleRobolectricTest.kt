@@ -121,12 +121,10 @@ class ExampleRobolectricTest {
                 is HapticFeedbackEvent.QuantumHarvest -> hapticManager.onQuantumHarvest(event.type)
                 is HapticFeedbackEvent.ParticleRepel -> hapticManager.onParticleRepel()
                 is HapticFeedbackEvent.DilationAnchorPulse -> hapticManager.onDilationAnchorPulse()
-                is HapticFeedbackEvent.SwipeSweep -> hapticManager.onSwipeSweep(event.count)
                 is HapticFeedbackEvent.FrequencyResonanceMatch -> hapticManager.onFrequencyResonanceMatch(event.precision)
                 is HapticFeedbackEvent.LevelTransition -> hapticManager.onLevelTransition(event.level)
                 is HapticFeedbackEvent.EmptyTap -> {}
                 is HapticFeedbackEvent.PhantomTap -> {}
-                is HapticFeedbackEvent.PhantomDissolve -> {}
             }
         }
 
@@ -238,7 +236,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun testSweepStreamScoringParticlesVsPhantoms() {
+    fun testTapHarvestScoringAndPhantomPenalty() {
         val engine = GameEngine()
         engine.startNewGame(level = 1, carryDcoins = 10)
         val initialCoins = engine.state.value.dcoins
@@ -269,11 +267,8 @@ class ExampleRobolectricTest {
         )
 
         val densityBefore = engine.state.value.density
-        // Execute swipe through both bubbles
-        engine.handleSwipe(
-            start = androidx.compose.ui.geometry.Offset(200f, 300f),
-            end = androidx.compose.ui.geometry.Offset(400f, 300f)
-        )
+        engine.handleTap(androidx.compose.ui.geometry.Offset(250f, 300f))
+        engine.handleTap(androidx.compose.ui.geometry.Offset(350f, 300f))
 
         // Both bubbles should be harvested, dcoins should INCREASE (never decrease)
         assertTrue("Dcoins must increase after swiping bubbles", engine.state.value.dcoins > initialCoins)
@@ -295,10 +290,7 @@ class ExampleRobolectricTest {
         )
         val densityBeforePhantom = engine.state.value.density
         val coinsBeforePhantom = engine.state.value.dcoins
-        engine.handleSwipe(
-            start = androidx.compose.ui.geometry.Offset(200f, 300f),
-            end = androidx.compose.ui.geometry.Offset(400f, 300f)
-        )
+        engine.handleTap(androidx.compose.ui.geometry.Offset(250f, 300f))
 
         // Density decreases by phantom penalty, combo resets to 0, but coins are untouched
         assertEquals(coinsBeforePhantom, engine.state.value.dcoins)

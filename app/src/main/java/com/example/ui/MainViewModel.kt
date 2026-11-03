@@ -93,14 +93,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 is HapticFeedbackEvent.ParticleRepel -> hapticManager.onParticleRepel()
                 is HapticFeedbackEvent.DilationAnchorPulse -> hapticManager.onDilationAnchorPulse()
-                is HapticFeedbackEvent.SwipeSweep -> {
-                    hapticManager.onSwipeSweep(event.count)
-                    audioEngine.playSweepStreamSound(engine.state.value.level, dissolvedPhantoms = false)
-                }
-                is HapticFeedbackEvent.PhantomDissolve -> {
-                    hapticManager.onSwipeSweep(2)
-                    audioEngine.playSweepStreamSound(engine.state.value.level, dissolvedPhantoms = true)
-                }
                 is HapticFeedbackEvent.FrequencyResonanceMatch -> {
                     hapticManager.onFrequencyResonanceMatch(event.precision)
                     if (event.precision >= 0.85f && !wasResonating) {
@@ -112,7 +104,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 is HapticFeedbackEvent.LevelTransition -> {
                     hapticManager.onLevelTransition(event.level)
-                    audioEngine.playSingularityGatewayDive()
+                    if (event.level > 1) audioEngine.playSingularityGatewayDive()
                 }
                 is HapticFeedbackEvent.EmptyTap -> {
                     audioEngine.playEmptyTapOrPhantom(isPhantom = false)
@@ -231,8 +223,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startGameFromScreen() {
-        audioEngine.playSweepStreamSound(1, false)
         engine.startNewGame(cycle = 1, level = 1, carryDcoins = 0)
+        audioEngine.playCosmicIgnition()
     }
 
     fun proceedToLevel2() {
@@ -259,10 +251,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onLongPressEnd() {
         engine.setDilationAnchor(false, null)
-    }
-
-    fun onSwipe(start: Offset, end: Offset) {
-        engine.handleSwipe(start, end)
     }
 
     fun onFrequencyDrag(ratio: Float, isTouching: Boolean) {

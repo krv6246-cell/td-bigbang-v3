@@ -20,7 +20,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -850,9 +849,7 @@ private fun BottomControlBar(
             ) {
                 GestureHintItem(label = "TUNE", desc = "Hold 5s to Lock", color = SingularityGold)
                 Text(text = "•", color = TextMuted)
-                GestureHintItem(label = "SWIPE", desc = "Sweep Stream", color = SingularityGold)
-                Text(text = "•", color = TextMuted)
-                GestureHintItem(label = "TAP", desc = "Field Ripple", color = RadiantTurquoise)
+                GestureHintItem(label = "DRAG", desc = "Match Frequency", color = RadiantTurquoise)
             }
         } else {
             Row(
@@ -863,12 +860,6 @@ private fun BottomControlBar(
                 GestureHintItem(label = "TAP", desc = "Stabilize Quanta", color = RadiantTurquoise)
                 Text(text = "•", color = TextMuted)
                 GestureHintItem(label = "HOLD", desc = "Dilate Time", color = SingularityGold)
-                Text(text = "•", color = TextMuted)
-                GestureHintItem(
-                    label = "SWIPE",
-                    desc = "Sweep Stream",
-                    color = if (state.level == 2) QuasarBlueShift else RadiantTurquoise
-                )
             }
         }
 
@@ -1641,14 +1632,8 @@ fun QuantumGuidanceDialog(onClose: () -> Unit) {
                 )
 
                 GuidanceItem(
-                    title = "3. SWIPE: QUANTUM STREAM SWEEP",
-                    desc = "Slice through chains of bubbles to harvest multi-combos with rapid haptic bursts.",
-                    color = QuantumJade
-                )
-
-                GuidanceItem(
-                    title = "4. LEVEL 2 QUASAR & LEVEL 3 POINT ZERO SYNTHESIZER",
-                    desc = "At 500 Dcoins, enter Quasar Repulsion dynamics. At 1000 Dcoins, unlock Point Zero: slide vertically to modulate pitch with the real-time audio synthesizer, matching the carrier frequency and holding pitch to lock harmonic resonance and achieve Absolute Zero Entropy.",
+                    title = "3. QUASAR & POINT ZERO",
+                    desc = "At 500 Dcoins, enter Quasar dynamics. At 1000 Dcoins, unlock Point Zero: drag vertically to match the moving frequency, then hold the resonance to reach Absolute Zero Entropy.",
                     color = QuasarBlueShift
                 )
 

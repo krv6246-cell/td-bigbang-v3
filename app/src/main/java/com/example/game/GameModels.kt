@@ -71,12 +71,10 @@ sealed interface HapticFeedbackEvent {
     data class QuantumHarvest(val type: QuantumType) : HapticFeedbackEvent
     data object ParticleRepel : HapticFeedbackEvent
     data object DilationAnchorPulse : HapticFeedbackEvent
-    data class SwipeSweep(val count: Int) : HapticFeedbackEvent
     data class FrequencyResonanceMatch(val precision: Float) : HapticFeedbackEvent
     data class LevelTransition(val level: Int) : HapticFeedbackEvent
     data object EmptyTap : HapticFeedbackEvent
     data object PhantomTap : HapticFeedbackEvent
-    data object PhantomDissolve : HapticFeedbackEvent
 }
 
 data class QuantumBubble(
@@ -108,14 +106,6 @@ data class Shockwave(
     val maxRadius: Float,
     var alpha: Float,
     val color: Color
-)
-
-data class GestureTrail(
-    val id: Long = 0L,
-    val points: List<Offset>,
-    var alpha: Float = 1.0f,
-    val color: Color = RadiantTurquoise,
-    val level: Int = 1
 )
 
 data class FloatingText(

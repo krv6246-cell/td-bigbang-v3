@@ -177,6 +177,23 @@ class BigBangAudioEngine(context: Context) {
     // ЗВУКОВЫЕ ЭФФЕКТЫ (FX)
     // ==========================================
 
+    fun playCosmicIgnition() {
+        ensureAudioInitialized()
+        if (isMuted.get()) return
+
+        val duration = 0.95
+        val totalSamples = (duration * SAMPLE_RATE).toInt()
+        pendingSounds.add(
+            ActiveSoundEvent(nextEventId++, totalSamples) { sIdx, progress ->
+                val t = sIdx.toDouble() / SAMPLE_RATE
+                val envelope = (1.0 - progress) * (0.75 + progress * 0.25)
+                val risingTone = sin(TWO_PI * (220.0 * t + 145.0 * t * t))
+                val octave = sin(TWO_PI * (440.0 * t + 290.0 * t * t)) * 0.28
+                (risingTone + octave) * envelope * 0.42
+            }
+        )
+    }
+
     /**
      * ЗВУК 1: Тап по Dcoin — короткий мягкий «дзынь» с нарастанием частоты по комбо.
      * Каждое 5-е комбо совершает скачок в октаву.
@@ -232,67 +249,6 @@ class BigBangAudioEngine(context: Context) {
                 (wave + sub + click) * envelope * 0.55
             }
         )
-    }
-
-    /**
-     * ЗВУК SWEEP STREAM: Уровень 1 (свист-кристалл), Уровень 2 (энергичный ионный вжик), Уровень 3 (мягкий колокольный перезвон-эхо).
-     */
-    fun playSweepStreamSound(level: Int, dissolvedPhantoms: Boolean = false) {
-        ensureAudioInitialized()
-        if (isMuted.get()) return
-
-        when (level) {
-            3 -> {
-                // Level 3 (Point Zero): Тонкий мягкий колокольный звук с лёгким эхо-затуханием
-                val duration = if (dissolvedPhantoms) 0.65 else 0.48
-                val totalSamples = (duration * SAMPLE_RATE).toInt()
-                val baseFreq = if (dissolvedPhantoms) 880.0 else 784.0 // A5 / G5
-
-                pendingSounds.add(
-                    ActiveSoundEvent(nextEventId++, totalSamples) { sIdx, progress ->
-                        val t = sIdx.toDouble() / SAMPLE_RATE
-                        val envelope = exp(-progress * 5.0) * (1.0 - progress)
-                        val bell1 = sin(TWO_PI * baseFreq * t)
-                        val bell2 = sin(TWO_PI * (baseFreq * 2.76) * t) * 0.25
-                        val echo = sin(TWO_PI * (baseFreq * 1.5) * (t - 0.08)) * exp(-progress * 4.0).coerceAtLeast(0.0) * 0.2
-                        (bell1 + bell2 + echo) * envelope * 0.5
-                    }
-                )
-            }
-            2 -> {
-                // Level 2 (Quasar): Плотный, энергичный ионный разряд («вжух» + затухание релятивистского потока)
-                val duration = if (dissolvedPhantoms) 0.42 else 0.32
-                val totalSamples = (duration * SAMPLE_RATE).toInt()
-
-                pendingSounds.add(
-                    ActiveSoundEvent(nextEventId++, totalSamples) { sIdx, progress ->
-                        val t = sIdx.toDouble() / SAMPLE_RATE
-                        val freq = 520.0 * (1.0 - progress * 0.6) + sin(progress * 18.0) * 45.0
-                        val envelope = (1.0 - progress) * exp(-progress * 7.5)
-                        val wave = sin(TWO_PI * freq * t)
-                        val sub = sin(TWO_PI * (freq * 0.5) * t) * 0.35
-                        val noise = (Random.nextDouble() - 0.5) * (1.0 - progress) * 0.2
-                        (wave + sub + noise) * envelope * 0.6
-                    }
-                )
-            }
-            else -> {
-                // Level 1 (Big Bang): Тонкий свист квантового рассечения (воздушный кристалличный чирк)
-                val duration = if (dissolvedPhantoms) 0.38 else 0.28
-                val totalSamples = (duration * SAMPLE_RATE).toInt()
-
-                pendingSounds.add(
-                    ActiveSoundEvent(nextEventId++, totalSamples) { sIdx, progress ->
-                        val t = sIdx.toDouble() / SAMPLE_RATE
-                        val freq = 680.0 + (1100.0 - 680.0) * (1.0 - progress)
-                        val envelope = exp(-progress * 8.5) * (1.0 - progress)
-                        val wave = sin(TWO_PI * freq * t)
-                        val harmonic = sin(TWO_PI * (freq * 2.0) * t) * 0.22
-                        (wave + harmonic) * envelope * 0.48
-                    }
-                )
-            }
-        }
     }
 
     /**
@@ -446,7 +402,6 @@ class BigBangAudioEngine(context: Context) {
 
     private fun audioSynthesisLoop() {
         val audioBuffer = ShortArray(BUFFER_SIZE)
-        val stepSamples = (SAMPLE_RATE * 0.30).toInt() // Длина тактового шага (~100 BPM)
 
         while (isRunning.get()) {
             if (isMuted.get()) {
@@ -487,11 +442,10 @@ class BigBangAudioEngine(context: Context) {
                     alarmSample = (rumble + warningBeep) * severity * 0.75
                 }
 
-                // 3. МУЗЫКА: Процедурный Cyber-Zen эмбиент (громкость 30% от эффектов)
-                val musicSample = generateAmbientMusicSample(stepSamples)
+                // 3. Procedural soundtrack with a different tempo for each universe.
+                val musicSample = generateAmbientMusicSample(ambientStepSamples())
 
-                // Итоговое суммирование: Звуки (100%) + Тревога (100%) + Музыка (30%)
-                val finalMix = fxSample + alarmSample + (musicSample * 0.30)
+                val finalMix = fxSample + alarmSample + (musicSample * 0.28)
                 val softClipped = finalMix.coerceIn(-0.95, 0.95)
 
                 audioBuffer[i] = (softClipped * 32767.0).toInt().toShort()
@@ -536,12 +490,15 @@ class BigBangAudioEngine(context: Context) {
             }
         }
 
-        // В фазе Compression добавляется мягкий пульсирующий суб-бас
-        if (gamePhaseId == 3 || currentLevel == 2) {
-            val bassFreq = if (musicMeasure % 2 == 0) 55.0 else 65.41 // A1 / C2
+        if (gamePhaseId == 3 || currentLevel == 2 || currentLevel == 3) {
+            val bassFreq = when {
+                currentLevel == 3 -> 82.41
+                musicMeasure % 2 == 0 -> 55.0
+                else -> 65.41
+            }
             bassPulsePhase = (bassPulsePhase + TWO_PI * bassFreq / SAMPLE_RATE) % TWO_PI
             val pulseLfo = sin(TWO_PI * 1.5 * (musicStepTimer.toDouble() / stepSamples)) * 0.5 + 0.5
-            val bassWave = sin(bassPulsePhase) * 0.35 * pulseLfo
+            val bassWave = sin(bassPulsePhase) * (if (currentLevel == 3) 0.16 else 0.24) * pulseLfo
             musicMix += bassWave
         }
 
@@ -555,26 +512,31 @@ class BigBangAudioEngine(context: Context) {
         val isExpansion = gamePhaseId == 1 && currentLevel == 1
         val isPointZero = currentLevel == 3
 
-        // Базовые частоты Cyber-Zen (A, D, E, G)
-        val zenFrequencies = if (isPointZero) {
-            // Мажорные гармонические обертона для финального уровня (E4, G#4, B4, E5)
-            doubleArrayOf(329.63, 415.30, 493.88, 659.25)
-        } else {
-            // Медитативные пентатонические тона (A3, C4, D4, E4)
-            doubleArrayOf(220.0, 261.63, 293.66, 329.63)
+        val scale = when {
+            isPointZero -> doubleArrayOf(329.63, 369.99, 415.30, 493.88, 554.37, 659.25, 739.99, 830.61)
+            currentLevel == 2 -> doubleArrayOf(196.00, 220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25)
+            else -> doubleArrayOf(220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33)
         }
 
-        // В Expansion ноты звучат редко (много тишины, только на долях 0 и 8)
-        val shouldPlay = if (isExpansion) {
-            step == 0 || (step == 8 && measure % 2 == 1)
-        } else {
-            step % 4 == 0
+        if (step % 2 == 0) {
+            val freq = scale[(step / 2 + measure * 2) % scale.size]
+            val duration = if (isExpansion) 1.4 else 1.05
+            spawnMusicVoice(freq, durationSec = duration, isWarm = isPointZero)
+            if (step % 4 == 0) {
+                spawnMusicVoice(freq * 1.5, durationSec = duration * 0.9, isWarm = isPointZero)
+            }
         }
+    }
 
-        if (shouldPlay) {
-            val freq = zenFrequencies[(step / 4 + measure) % zenFrequencies.size]
-            spawnMusicVoice(freq, durationSec = if (isExpansion) 2.4 else 1.2, isWarm = isPointZero)
+    private fun ambientStepSamples(): Int {
+        val bpm = when {
+            currentLevel == 2 -> 94.0
+            currentLevel == 3 -> 72.0
+            gamePhaseId == 3 -> 88.0
+            gamePhaseId == 2 -> 78.0
+            else -> 68.0
         }
+        return (SAMPLE_RATE * 60.0 / bpm / 2.0).toInt()
     }
 
     private fun spawnMusicVoice(frequency: Double, durationSec: Double, isWarm: Boolean) {

@@ -124,24 +124,6 @@ class HapticManager(private val context: Context) {
     }
 
     /**
-     * Tactile feedback for fast multi-bubble swipe sweeps.
-     */
-    fun onSwipeSweep(count: Int) {
-        if (vibrator == null || !vibrator.hasVibrator()) return
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(
-                    if (count > 1) VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK)
-                    else VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate((count * 12L).coerceIn(15L, 45L))
-            }
-        } catch (_: Exception) {}
-    }
-
-    /**
      * Tactile feedback during Level 3 Frequency Matching (Resonance Tuning).
      * Modulates vibration intensity and texture based on harmonic alignment precision [0.0..1.0].
      */

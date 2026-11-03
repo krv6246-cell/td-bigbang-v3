@@ -10,6 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -50,6 +51,12 @@ fun GameCanvas(
     state: GameState,
     modifier: Modifier = Modifier
 ) {
+    val stars = remember {
+        List(96) { index ->
+            val random = kotlin.random.Random(index * 97 + 11)
+            floatArrayOf(random.nextFloat(), random.nextFloat(), random.nextFloat(), random.nextFloat())
+        }
+    }
     val infiniteTransition = rememberInfiniteTransition(label = "singularity_pulse")
     val pulseAnim by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -72,6 +79,31 @@ fun GameCanvas(
 
         // 1. Draw Deep Cyber-Zen Space Void Background
         drawRect(color = SpaceVoid)
+
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(AntimatterViolet.copy(alpha = 0.13f), Color.Transparent),
+                center = Offset(width * 0.13f, height * 0.18f),
+                radius = width * 0.85f
+            )
+        )
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(RadiantTurquoise.copy(alpha = 0.08f), Color.Transparent),
+                center = Offset(width * 0.88f, height * 0.82f),
+                radius = width * 0.72f
+            )
+        )
+
+        for ((index, star) in stars.withIndex()) {
+            val twinkle = 0.25f + ((sin(pulseAnim * (2f + star[3] * 5f) + index) + 1f) * 0.5f) * 0.55f
+            val starColor = if (index % 5 == 0) RadiantTurquoise else Color.White
+            drawCircle(
+                color = starColor.copy(alpha = twinkle),
+                radius = 0.7f + star[2] * 1.5f,
+                center = Offset(star[0] * width, star[1] * height)
+            )
+        }
 
         // Level 2 "Blue-Shift" Visual Filter (Quasar state)
         if (state.isBlueShiftActive || state.level == 2) {

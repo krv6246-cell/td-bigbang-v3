@@ -66,7 +66,6 @@ class GameEngine {
     val particles = mutableListOf<Particle>()
     val shockwaves = mutableListOf<Shockwave>()
     val floatingTexts = mutableListOf<FloatingText>()
-    val gestureTrails = mutableListOf<GestureTrail>()
 
     private var nextEntityId = 1L
     private var spawnTimer = 0f
@@ -128,7 +127,6 @@ class GameEngine {
         particles.clear()
         shockwaves.clear()
         floatingTexts.clear()
-        gestureTrails.clear()
         _state.value = GameState(
             phase = GamePhase.START_SCREEN,
             density = 100.0f
@@ -140,7 +138,6 @@ class GameEngine {
         particles.clear()
         shockwaves.clear()
         floatingTexts.clear()
-        gestureTrails.clear()
         operatorCooldownsInternal.clear()
         freezeTimer = 0f
         shieldTimer = 0f
@@ -183,7 +180,6 @@ class GameEngine {
     fun transitionToLevel2() {
         val current = _state.value
         bubbles.clear()
-        gestureTrails.clear()
 
         _state.value = current.copy(
             level = 2,
@@ -208,7 +204,6 @@ class GameEngine {
         val current = _state.value
         bubbles.clear()
         particles.clear()
-        gestureTrails.clear()
 
         _state.value = current.copy(
             level = 3,
@@ -1014,72 +1009,6 @@ class GameEngine {
         }
     }
 
-    fun handleSwipe(start: Offset, end: Offset) {
-        val current = _state.value
-        if (current.isPaused || current.isTransitioning) return
-
-        val swipeDx = end.x - start.x
-        val swipeDy = end.y - start.y
-        val swipeLen = sqrt(swipeDx * swipeDx + swipeDy * swipeDy)
-        if (swipeLen < 40f) return
-
-        var harvested = 0
-        var dissolvedPhantoms = 0
-        val iterator = bubbles.iterator()
-
-        while (iterator.hasNext()) {
-            val bubble = iterator.next()
-            val distToSegment = distanceToSegment(bubble.position, start, end)
-
-            if (distToSegment <= bubble.radius + 38f) {
-                iterator.remove()
-                if (bubble.type == QuantumType.PHANTOM_SINGULARITY) {
-                    // Штраф только за фантомы (X)!
-                    dissolvedPhantoms++
-                    processBubbleHarvest(bubble, bubble.position)
-                } else {
-                    // Все обычные квантовые частицы (включая Dcoins, Jade, Turquoise, Antimatter) добавляют очки и плотность
-                    processBubbleHarvest(bubble, bubble.position)
-                    harvested++
-                }
-            }
-        }
-
-        val mid = Offset((start.x + end.x) / 2f, (start.y + end.y) / 2f)
-        val shockwaveColor = when (current.level) {
-            3 -> SingularityGold
-            2 -> QuasarBlueShift
-            else -> RadiantTurquoise
-        }
-
-        shockwaves.add(
-            Shockwave(
-                center = mid,
-                radius = 12f,
-                maxRadius = swipeLen * 0.7f,
-                alpha = 0.75f,
-                color = shockwaveColor
-            )
-        )
-
-        if (dissolvedPhantoms > 0) {
-            hapticListener?.invoke(HapticFeedbackEvent.PhantomDissolve)
-        } else if (harvested > 0) {
-            hapticListener?.invoke(HapticFeedbackEvent.SwipeSweep(harvested))
-        }
-
-        if (harvested > 1) {
-            floatingTexts.add(
-                FloatingText(
-                    id = nextEntityId++,
-                    text = "SWEEP x$harvested",
-                    position = mid,
-                    color = SingularityGold
-                )
-            )
-        }
-    }
-
     // --- LEVEL 3 FREQUENCY MODULATION INPUT ---
     fun updatePlayerFrequencyInput(yNormalized: Float, isTouching: Boolean) {
         val current = _state.value
@@ -1167,31 +1096,11 @@ class GameEngine {
         }
     }
 
-    private fun distanceToSegment(p: Offset, a: Offset, b: Offset): Float {
-        val abx = b.x - a.x
-        val aby = b.y - a.y
-        val apx = p.x - a.x
-        val apy = p.y - a.y
-        val abLenSq = abx * abx + aby * aby
-        if (abLenSq == 0f) {
-            val dx = p.x - a.x
-            val dy = p.y - a.y
-            return sqrt(dx * dx + dy * dy)
-        }
-        val t = ((apx * abx + apy * aby) / abLenSq).coerceIn(0f, 1f)
-        val projX = a.x + t * abx
-        val projY = a.y + t * aby
-        val dx = p.x - projX
-        val dy = p.y - projY
-        return sqrt(dx * dx + dy * dy)
-    }
-
     fun stopEngine() {
         hapticListener = null
         bubbles.clear()
         particles.clear()
         shockwaves.clear()
         floatingTexts.clear()
-        gestureTrails.clear()
     }
 }

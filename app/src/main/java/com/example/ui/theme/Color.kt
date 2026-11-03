@@ -2,10 +2,10 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val SpaceVoid = Color(0xFF05080A)
-val DeepAbyss = Color(0xFF0A1017)
-val CyberSurface = Color(0xFF101B24)
-val SurfaceBorder = Color(0xFF1B2F3D)
+val SpaceVoid = Color(0xFF040711)
+val DeepAbyss = Color(0xFF0A1020)
+val CyberSurface = Color(0xFF111A2B)
+val SurfaceBorder = Color(0xFF26374B)
 
 val QuantumJade = Color(0xFF00E5A3)
 val RadiantTurquoise = Color(0xFF00E5FF)
